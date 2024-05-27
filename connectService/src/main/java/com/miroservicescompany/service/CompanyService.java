@@ -4,14 +4,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.miroservicescompany.dto.CompanyDto;
 import com.miroservicescompany.dto.EncryptedData;
 import com.miroservicescompany.dto.Encryption;
+import com.miroservicescompany.email.EmailSender;
 import com.miroservicescompany.entity.Company;
 import com.miroservicescompany.enumeration.GraceStatus;
 import com.miroservicescompany.enumeration.Status;
@@ -21,9 +19,6 @@ import com.miroservicescompany.exception.CompanyServiceException;
 import com.miroservicescompany.exception.EncryptionException;
 import com.miroservicescompany.generator.SecretKeyGenerator;
 import com.miroservicescompany.repository.CompanyRepository;
-import com.miroservicescompany.response.Response;
-import com.miroservicescompany.response.ResponseGenerator;
-import com.miroservicescompany.response.TransactionContext;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,11 +26,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CompanyService {
 
-	private final ResponseGenerator responseGenerator;
+	//private final ResponseGenerator responseGenerator;
 
 	private final CompanyRepository companyRepository;
 
 	private final LicenseGenerator licenseGenerator;
+	
+	private final EmailSender emailSender;
 
 	private final SecretKeyGenerator encryptionService;
 
@@ -55,18 +52,21 @@ public class CompanyService {
 		}
 	}
 
-	public EncryptedData encryptEmailLicense(String companyName) {
-		Company company = companyRepository.findByCompanyName(companyName)
-				.orElseThrow(() -> new CompanyNotFoundException("Company not found: " + companyName));
-		try {
-			EncryptedData encryptedData = encryptionService.encrypt(company.getEmail() + ";" + company.getLicense());
-			company.setStatus(Status.REQUEST);
-			companyRepository.save(company);
-			return encryptedData;
-		} catch (Exception e) {
-			throw new EncryptionException("Encryption failed for company: " + companyName, e);
-		}
+	public EncryptedData encryptEmailLicense(String companyName, String adminEmail, String subject) {
+	    Company company = companyRepository.findByCompanyName(companyName)
+	            .orElseThrow(() -> new CompanyNotFoundException("Company not found: " + companyName));
+	    try {
+	        EncryptedData encryptedData = encryptionService.encrypt(company.getEmail() + ";" + company.getLicense());
+	        company.setStatus(Status.REQUEST);
+	        companyRepository.save(company);
+	        emailSender.sendMail(adminEmail, subject, encryptedData.getSecretKey(),
+	                encryptedData.getEncryptedData());
+	        return encryptedData;
+	    } catch (Exception e) {
+	        throw new EncryptionException("Encryption failed for company: " + companyName, e);
+	    }
 	}
+
 
 	public CompanyDto getLicense(Long id) {
 		try {
@@ -102,30 +102,36 @@ public class CompanyService {
 	}
 
 	public String decryptForActivate(Encryption encryption) {
-        if (encryption != null) {
-            LocalDate activationDate = LocalDate.now();
-            Optional<Company> companyOptional = companyRepository.findByEmailAndLicense(encryption.getEmail(), encryption.getLicense());
+	    try {
+	        if (encryption != null && encryption.getEmail() != null && encryption.getLicense() != null) {
+	            LocalDate activationDate = LocalDate.now();
+	            Optional<Company> companyOptional = companyRepository.findByEmailAndLicense(encryption.getEmail(), encryption.getLicense());
 
-            if (companyOptional.isPresent()) {
-                Company company = companyOptional.get();
-                company.setActivationDate(activationDate);
-                LocalDate expireDate = activationDate.plusDays(30); // Set expiration date 30 days from activation
-                company.setExpireDate(expireDate);
-                company.setGraceStatus(GraceStatus.ACTIVE);
+	            if (companyOptional.isPresent()) {
+	                Company company = companyOptional.get();
+	                company.setActivationDate(activationDate);
+	                LocalDate expireDate = activationDate.plusDays(30); // Set expiration date 30 days from activation
+	                company.setExpireDate(expireDate);
+	                company.setGraceStatus(GraceStatus.ACTIVE);
 
-                // Calculate grace period
-                LocalDate gracePeriodStart = expireDate.plusDays(1);
-                LocalDate gracePeriodEnd = gracePeriodStart.plusDays(1);
-                company.setGracePeriod(gracePeriodEnd); // Set the end date of the grace period
+	                // Calculate grace period
+	                LocalDate gracePeriodStart = expireDate.plusDays(1);
+	                LocalDate gracePeriodEnd = gracePeriodStart.plusDays(1);
+	                company.setGracePeriod(gracePeriodEnd); // Set the end date of the grace period
 
-                company.setStatus(Status.APPROVED);
+	                company.setStatus(Status.APPROVED);
 
-                companyRepository.save(company);
-                return "Company activated successfully";
-            } else {
-                return "Company not found";
-            }
-        }
-        return "Invalid encryption data";
-    }
+	                companyRepository.save(company);
+	                return "Company activated successfully";
+	            } else {
+	                return "Company not found";
+	            }
+	        } else {
+	            return "Invalid encryption data";
+	        }
+	    } catch (Exception e) {
+	        throw new RuntimeException("Error activating company", e);
+	    }
+	}
+
 }

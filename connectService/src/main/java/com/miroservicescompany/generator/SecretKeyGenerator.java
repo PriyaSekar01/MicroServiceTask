@@ -38,7 +38,7 @@ public class SecretKeyGenerator {
         }
     }
 
-    private SecretKey generateSecretKey() throws NoSuchAlgorithmException {
+    public SecretKey generateSecretKey() throws NoSuchAlgorithmException {
         KeyGenerator keyGen = KeyGenerator.getInstance(ALGORITHM);
         keyGen.init(256); // AES key size can be 128, 192, or 256
         return keyGen.generateKey();

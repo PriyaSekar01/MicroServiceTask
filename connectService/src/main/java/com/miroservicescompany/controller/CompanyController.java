@@ -46,18 +46,22 @@ public class CompanyController {
         }
     }
 	
-	@GetMapping("/encryptEmailLicense")
-    public ResponseEntity<Response> encryptEmailLicense(@RequestParam String companyName) {
-        TransactionContext context = responseGenerator.generateTransactionContext(null);
-        try {
-          EncryptedData encryptedData = companyService.encryptEmailLicense(companyName);
-            return responseGenerator.successResponse(context, encryptedData, HttpStatus.OK);
-        } catch (EncryptionException e) {
-            return responseGenerator.errorResponse(context, "Encryption failed", HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (CompanyNotFoundException e) {
-            return responseGenerator.errorResponse(context, "Company not found", HttpStatus.NOT_FOUND);
-        }
-    }
+	@PostMapping("/encryptEmailLicense")
+	public ResponseEntity<Response> encryptEmailLicense(@RequestParam String companyName,
+	                                                    @RequestParam String adminEmail,
+	                                                    @RequestParam String subject) {
+	    TransactionContext context = responseGenerator.generateTransactionContext(null);
+	    try {
+	        EncryptedData encryptedData = companyService.encryptEmailLicense(companyName, adminEmail, subject);
+	        return responseGenerator.successResponse(context, encryptedData, HttpStatus.OK);
+	    } catch (EncryptionException e) {
+	        return responseGenerator.errorResponse(context, "Encryption failed", HttpStatus.INTERNAL_SERVER_ERROR);
+	    } catch (CompanyNotFoundException e) {
+	        return responseGenerator.errorResponse(context, "Company not found", HttpStatus.NOT_FOUND);
+	    }
+	}
+
+
 	
 	 @GetMapping("/license/{id}")
 	    public ResponseEntity<Response> getLicenseById(@PathVariable Long id) {
@@ -89,8 +93,12 @@ public class CompanyController {
 	    }
 	 
 	 @PostMapping("/decryptForActivate")
-	    public ResponseEntity<String> activate(@RequestBody Encryption encryption) {
-	        String result = companyService.decryptForActivate(encryption);
-	        return ResponseEntity.ok(result);
-	    }
+	 public ResponseEntity<String> activate(@RequestBody Encryption encryption) {
+	     try {
+	         String result = companyService.decryptForActivate(encryption);
+	         return ResponseEntity.ok(result);
+	     } catch (Exception e) {
+	         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error activating company: " + e.getMessage());
+	     }
+	 }
 }
