@@ -20,18 +20,19 @@ import com.miroservicescompany.exception.EncryptionException;
 import com.miroservicescompany.generator.SecretKeyGenerator;
 import com.miroservicescompany.repository.CompanyRepository;
 
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class CompanyService {
 
-	//private final ResponseGenerator responseGenerator;
+	// private final ResponseGenerator responseGenerator;
 
 	private final CompanyRepository companyRepository;
 
 	private final LicenseGenerator licenseGenerator;
-	
+
 	private final EmailSender emailSender;
 
 	private final SecretKeyGenerator encryptionService;
@@ -56,11 +57,24 @@ public class CompanyService {
 	    Company company = companyRepository.findByCompanyName(companyName)
 	            .orElseThrow(() -> new CompanyNotFoundException("Company not found: " + companyName));
 	    try {
+	        // Encrypt email and license
 	        EncryptedData encryptedData = encryptionService.encrypt(company.getEmail() + ";" + company.getLicense());
 	        company.setStatus(Status.REQUEST);
 	        companyRepository.save(company);
-	        emailSender.sendMail(adminEmail, subject, encryptedData.getSecretKey(),
-	                encryptedData.getEncryptedData());
+
+	        // Decrypt the email and license key for inclusion in the email content
+	        Encryption decryptedData = encryptionService.decrypt(encryptedData.getEncryptedData(), encryptedData.getSecretKey());
+	        if (decryptedData == null) {
+	            throw new EncryptionException("Decryption failed for company: " + companyName);
+	        }
+
+	        // Construct the email content
+	        String emailContent = String.format(
+	                "Decrypted Data:\nEmail: %s\nLicense Key: %s",
+	                decryptedData.getEmail(), decryptedData.getLicense()
+	        );
+
+	        emailSender.sendMail(adminEmail, subject, emailContent);
 	        return encryptedData;
 	    } catch (Exception e) {
 	        throw new EncryptionException("Encryption failed for company: " + companyName, e);
@@ -102,36 +116,37 @@ public class CompanyService {
 	}
 
 	public String decryptForActivate(Encryption encryption) {
-	    try {
-	        if (encryption != null && encryption.getEmail() != null && encryption.getLicense() != null) {
-	            LocalDate activationDate = LocalDate.now();
-	            Optional<Company> companyOptional = companyRepository.findByEmailAndLicense(encryption.getEmail(), encryption.getLicense());
+		try {
+			if (encryption != null && encryption.getEmail() != null && encryption.getLicense() != null) {
+				LocalDate activationDate = LocalDate.now();
+				Optional<Company> companyOptional = companyRepository.findByEmailAndLicense(encryption.getEmail(),
+						encryption.getLicense());
 
-	            if (companyOptional.isPresent()) {
-	                Company company = companyOptional.get();
-	                company.setActivationDate(activationDate);
-	                LocalDate expireDate = activationDate.plusDays(30); // Set expiration date 30 days from activation
-	                company.setExpireDate(expireDate);
-	                company.setGraceStatus(GraceStatus.ACTIVE);
+				if (companyOptional.isPresent()) {
+					Company company = companyOptional.get();
+					company.setActivationDate(activationDate);
+					LocalDate expireDate = activationDate.plusDays(30); // Set expiration date 30 days from activation
+					company.setExpireDate(expireDate);
+					company.setGraceStatus(GraceStatus.ACTIVE);
 
-	                // Calculate grace period
-	                LocalDate gracePeriodStart = expireDate.plusDays(1);
-	                LocalDate gracePeriodEnd = gracePeriodStart.plusDays(1);
-	                company.setGracePeriod(gracePeriodEnd); // Set the end date of the grace period
+					// Calculate grace period
+					LocalDate gracePeriodStart = expireDate.plusDays(1);
+					LocalDate gracePeriodEnd = gracePeriodStart.plusDays(1);
+					company.setGracePeriod(gracePeriodEnd); // Set the end date of the grace period
 
-	                company.setStatus(Status.APPROVED);
+					company.setStatus(Status.APPROVED);
 
-	                companyRepository.save(company);
-	                return "Company activated successfully";
-	            } else {
-	                return "Company not found";
-	            }
-	        } else {
-	            return "Invalid encryption data";
-	        }
-	    } catch (Exception e) {
-	        throw new RuntimeException("Error activating company", e);
-	    }
+					companyRepository.save(company);
+					return "Company activated successfully";
+				} else {
+					return "Company not found";
+				}
+			} else {
+				return "Invalid encryption data";
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("Error activating company", e);
+		}
 	}
 
 }
