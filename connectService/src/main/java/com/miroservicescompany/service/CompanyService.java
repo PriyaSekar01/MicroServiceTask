@@ -80,6 +80,10 @@ public class CompanyService {
 	        throw new EncryptionException("Encryption failed for company: " + companyName, e);
 	    }
 	}
+	
+	
+	
+	
 
 
 	public CompanyDto getLicense(Long id) {
