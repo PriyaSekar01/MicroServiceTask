@@ -1,5 +1,6 @@
 package com.miroservicescompany.controller;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.miroservicescompany.dto.CompanyDto;
 import com.miroservicescompany.dto.EncryptedData;
 import com.miroservicescompany.dto.Encryption;
+import com.miroservicescompany.dto.OtpDetails;
 import com.miroservicescompany.entity.Company;
 import com.miroservicescompany.exception.CompanyAccessException;
 import com.miroservicescompany.exception.CompanyNotFoundException;
@@ -23,6 +25,7 @@ import com.miroservicescompany.response.Response;
 import com.miroservicescompany.response.ResponseGenerator;
 import com.miroservicescompany.response.TransactionContext;
 import com.miroservicescompany.service.CompanyService;
+import com.miroservicescompany.service.OtpService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,16 +38,40 @@ public class CompanyController {
 	
 	private final ResponseGenerator  responseGenerator;
 	
+	private final OtpService otpService;
+	
 	@PostMapping("/create")
-    public ResponseEntity<Response> createCompany(@RequestBody CompanyDto companyDto) {
-        TransactionContext context = responseGenerator.generateTransactionContext(null);
-        try {
-            Company createdCompany = companyService.createCompany(companyDto);
-            return responseGenerator.successResponse(context, createdCompany, HttpStatus.CREATED);
-        } catch (Exception e) {
-            return responseGenerator.errorResponse(context, "Failed to create company", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
+	public ResponseEntity<Response> createCompany(@RequestBody CompanyDto companyDto) {
+	    TransactionContext context = responseGenerator.generateTransactionContext(null);
+	    try {
+	        Company createdCompany = companyService.createCompany(companyDto);
+	        return responseGenerator.successResponse(context, createdCompany, HttpStatus.CREATED);
+	    } catch (Exception e) {
+	        return responseGenerator.errorResponse(context, "Failed to create company", HttpStatus.INTERNAL_SERVER_ERROR);
+	    }
+	}
+	 @PostMapping("/verify-otp")
+	    public ResponseEntity<Response> verifyOtp(@RequestParam String email, @RequestParam String otp) {
+	        TransactionContext context = responseGenerator.generateTransactionContext(null);
+	        try {
+	            boolean isValid = otpService.validateOtp(email, otp);
+	            if (isValid) {
+	                return responseGenerator.successResponse(context, "OTP verified successfully", HttpStatus.OK);
+	            } else {
+	                // Check if OTP is expired
+	                if (otpService.isOtpExpired(email)) {
+	                    return responseGenerator.errorResponse(context, "Expired OTP", HttpStatus.BAD_REQUEST);
+	                } else {
+	                    return responseGenerator.errorResponse(context, "Invalid OTP", HttpStatus.BAD_REQUEST);
+	                }
+	            }
+	        } catch (Exception e) {
+	            return responseGenerator.errorResponse(context, "Failed to verify OTP", HttpStatus.INTERNAL_SERVER_ERROR);
+	        }
+	    }
+
+	    
+
 	
 	@PostMapping("/encryptEmailLicense")
 	public ResponseEntity<Response> encryptEmailLicense(@RequestParam String companyName,

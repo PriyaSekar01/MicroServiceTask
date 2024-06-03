@@ -37,6 +37,8 @@ public class CompanyService {
 
 	private final SecretKeyGenerator encryptionService;
 
+	private final OtpService otpService;
+
 	public Company createCompany(CompanyDto companyDto) {
 		try {
 			Company company = Company.builder().companyName(companyDto.getCompanyName()).email(companyDto.getEmail())
@@ -47,44 +49,44 @@ public class CompanyService {
 			company.setLicense(license);
 			company.setStatus(Status.CREATE);
 
-			return companyRepository.save(company);
+			// Save company
+			Company savedCompany = companyRepository.save(company);
+
+			// Send OTP
+			otpService.generateAndSendOtp(companyDto.getEmail());
+
+			return savedCompany;
 		} catch (Exception e) {
 			throw new CompanyServiceException("Failed to create company", e);
 		}
 	}
 
 	public EncryptedData encryptEmailLicense(String companyName, String adminEmail, String subject) {
-	    Company company = companyRepository.findByCompanyName(companyName)
-	            .orElseThrow(() -> new CompanyNotFoundException("Company not found: " + companyName));
-	    try {
-	        // Encrypt email and license
-	        EncryptedData encryptedData = encryptionService.encrypt(company.getEmail() + ";" + company.getLicense());
-	        company.setStatus(Status.REQUEST);
-	        companyRepository.save(company);
+		Company company = companyRepository.findByCompanyName(companyName)
+				.orElseThrow(() -> new CompanyNotFoundException("Company not found: " + companyName));
+		try {
+			// Encrypt email and license
+			EncryptedData encryptedData = encryptionService.encrypt(company.getEmail() + ";" + company.getLicense());
+			company.setStatus(Status.REQUEST);
+			companyRepository.save(company);
 
-	        // Decrypt the email and license key for inclusion in the email content
-	        Encryption decryptedData = encryptionService.decrypt(encryptedData.getEncryptedData(), encryptedData.getSecretKey());
-	        if (decryptedData == null) {
-	            throw new EncryptionException("Decryption failed for company: " + companyName);
-	        }
+			// Decrypt the email and license key for inclusion in the email content
+			Encryption decryptedData = encryptionService.decrypt(encryptedData.getEncryptedData(),
+					encryptedData.getSecretKey());
+			if (decryptedData == null) {
+				throw new EncryptionException("Decryption failed for company: " + companyName);
+			}
 
-	        // Construct the email content
-	        String emailContent = String.format(
-	                "Decrypted Data:\nEmail: %s\nLicense Key: %s",
-	                decryptedData.getEmail(), decryptedData.getLicense()
-	        );
+			// Construct the email content
+			String emailContent = String.format("Decrypted Data:\nEmail: %s\nLicense Key: %s", decryptedData.getEmail(),
+					decryptedData.getLicense());
 
-	        emailSender.sendMail(adminEmail, subject, emailContent);
-	        return encryptedData;
-	    } catch (Exception e) {
-	        throw new EncryptionException("Encryption failed for company: " + companyName, e);
-	    }
+			emailSender.sendMail(adminEmail, subject, emailContent);
+			return encryptedData;
+		} catch (Exception e) {
+			throw new EncryptionException("Encryption failed for company: " + companyName, e);
+		}
 	}
-	
-	
-	
-	
-
 
 	public CompanyDto getLicense(Long id) {
 		try {
