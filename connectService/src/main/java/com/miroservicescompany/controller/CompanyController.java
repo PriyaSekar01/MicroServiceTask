@@ -1,6 +1,5 @@
 package com.miroservicescompany.controller;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.miroservicescompany.dto.CompanyDto;
 import com.miroservicescompany.dto.EncryptedData;
 import com.miroservicescompany.dto.Encryption;
-import com.miroservicescompany.dto.OtpDetails;
 import com.miroservicescompany.entity.Company;
 import com.miroservicescompany.exception.CompanyAccessException;
 import com.miroservicescompany.exception.CompanyNotFoundException;
