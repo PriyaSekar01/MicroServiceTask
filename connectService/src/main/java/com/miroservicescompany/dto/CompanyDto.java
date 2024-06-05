@@ -17,22 +17,24 @@ import lombok.NoArgsConstructor;
 public class CompanyDto {
 
 	private Long id;
-	
+
 	private String companyName;
-	
+
 	private String email;
+
+	private String password;
 	
-	 private String address;
-	 
-	 private LocalDate gracePeriod;
-	 
-	 private Status status;
-	 
-	 private GraceStatus graceStatus;
-	 
-	 private LocalDate activationDate;
-	 
-	 private LocalDate expireDate;
-	 
-	  private String license;
+	private String address;
+
+	private LocalDate gracePeriod;
+
+	private Status status;
+
+	private GraceStatus graceStatus;
+
+	private LocalDate activationDate;
+
+	private LocalDate expireDate;
+
+	private String license;
 }

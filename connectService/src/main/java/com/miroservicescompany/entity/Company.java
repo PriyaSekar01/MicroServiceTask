@@ -39,9 +39,13 @@ public class Company {
 	    @Column(name="email")
 	    private String email;
 	    
+	    @Column(name="password")
+	    private String password;
+	    
 	    @Column(name="address")
 	    private String address;
 
+	    
 	    @Column(name="grace_period")
 	    private LocalDate gracePeriod;
 	    

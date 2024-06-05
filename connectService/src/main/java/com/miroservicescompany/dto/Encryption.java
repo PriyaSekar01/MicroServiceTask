@@ -15,7 +15,6 @@ public class Encryption {
 	private String email;
 	
 	private String license;
-	
 
 	
 }

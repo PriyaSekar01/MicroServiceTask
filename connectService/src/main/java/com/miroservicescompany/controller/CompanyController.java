@@ -39,24 +39,52 @@ public class CompanyController {
 	private final OtpService otpService;
 	
 	@PostMapping("/create")
-	public ResponseEntity<Response> createCompany(@RequestBody CompanyDto companyDto) {
-	    TransactionContext context = responseGenerator.generateTransactionContext(null);
-	    try {
-	        Company createdCompany = companyService.createCompany(companyDto);
-	        return responseGenerator.successResponse(context, createdCompany, HttpStatus.CREATED);
-	    } catch (Exception e) {
-	        return responseGenerator.errorResponse(context, "Failed to create company", HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<Response> createCompany(@RequestBody CompanyDto companyDto) {
+        TransactionContext context = responseGenerator.generateTransactionContext(null);
+        try {
+            Company createdCompany = companyService.createCompany(companyDto);
+            return responseGenerator.successResponse(context, createdCompany, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return responseGenerator.errorResponse(context, "Failed to create company", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+	
+	@PostMapping("/login")
+    public ResponseEntity<Response> login(@RequestParam String email, @RequestParam String password) {
+        TransactionContext context = responseGenerator.generateTransactionContext(null);
+        try {
+            String result = companyService.login(email, password);
+            if (result.equals("Login successfully")) {
+                return responseGenerator.successResponse(context, result, HttpStatus.OK);
+            } else {
+                return responseGenerator.errorResponse(context, result, HttpStatus.BAD_REQUEST);
+            }
+        } catch (Exception e) {
+            return responseGenerator.errorResponse(context, "Failed to login", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+	
+	
+	 @PostMapping("/forgot-password")
+	    public ResponseEntity<Response> forgotPassword(@RequestParam String email) {
+	        TransactionContext context = responseGenerator.generateTransactionContext(null);
+	        try {
+	            otpService.generateAndSendOtp(email);
+	            return responseGenerator.successResponse(context, "OTP sent to email", HttpStatus.OK);
+	        } catch (Exception e) {
+	            return responseGenerator.errorResponse(context, "Failed to send OTP", HttpStatus.INTERNAL_SERVER_ERROR);
+	        }
 	    }
-	}
-	 @PostMapping("/verify-otp")
-	    public ResponseEntity<Response> verifyOtp(@RequestParam String email, @RequestParam String otp) {
+	 
+	 @PostMapping("/reset-password")
+	    public ResponseEntity<Response> resetPassword(@RequestParam String email, @RequestParam String otp, @RequestParam String newPassword) {
 	        TransactionContext context = responseGenerator.generateTransactionContext(null);
 	        try {
 	            boolean isValid = otpService.validateOtp(email, otp);
 	            if (isValid) {
-	                return responseGenerator.successResponse(context, "OTP verified successfully", HttpStatus.OK);
+	                companyService.resetPassword(email, newPassword);
+	                return responseGenerator.successResponse(context, "Password reset successfully", HttpStatus.OK);
 	            } else {
-	                // Check if OTP is expired
 	                if (otpService.isOtpExpired(email)) {
 	                    return responseGenerator.errorResponse(context, "Expired OTP", HttpStatus.BAD_REQUEST);
 	                } else {
@@ -64,12 +92,28 @@ public class CompanyController {
 	                }
 	            }
 	        } catch (Exception e) {
-	            return responseGenerator.errorResponse(context, "Failed to verify OTP", HttpStatus.INTERNAL_SERVER_ERROR);
+	            return responseGenerator.errorResponse(context, "Failed to reset password", HttpStatus.INTERNAL_SERVER_ERROR);
 	        }
 	    }
 
-	    
-
+    @PostMapping("/verify-otp")
+    public ResponseEntity<Response> verifyOtp(@RequestParam String email, @RequestParam String otp) {
+        TransactionContext context = responseGenerator.generateTransactionContext(null);
+        try {
+            boolean isValid = otpService.validateOtp(email, otp);
+            if (isValid) {
+                return responseGenerator.successResponse(context, "OTP verified successfully", HttpStatus.OK);
+            } else {
+                if (otpService.isOtpExpired(email)) {
+                    return responseGenerator.errorResponse(context, "Expired OTP", HttpStatus.BAD_REQUEST);
+                } else {
+                    return responseGenerator.errorResponse(context, "Invalid OTP", HttpStatus.BAD_REQUEST);
+                }
+            }
+        } catch (Exception e) {
+            return responseGenerator.errorResponse(context, "Failed to verify OTP", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 	
 	@PostMapping("/encryptEmailLicense")
 	public ResponseEntity<Response> encryptEmailLicense(@RequestParam String companyName,

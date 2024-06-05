@@ -19,8 +19,7 @@ import com.miroservicescompany.exception.CompanyServiceException;
 import com.miroservicescompany.exception.EncryptionException;
 import com.miroservicescompany.generator.SecretKeyGenerator;
 import com.miroservicescompany.repository.CompanyRepository;
-
-import jakarta.mail.MessagingException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -39,27 +38,58 @@ public class CompanyService {
 
 	private final OtpService otpService;
 
-	public Company createCompany(CompanyDto companyDto) {
-		try {
-			Company company = Company.builder().companyName(companyDto.getCompanyName()).email(companyDto.getEmail())
-					.address(companyDto.getAddress()).build();
+	
+	//singup
+	 @Transactional
+	    public Company createCompany(CompanyDto companyDto) {
+	        try {
+	            // Build company entity from DTO
+	            Company company = Company.builder()
+	                    .companyName(companyDto.getCompanyName())
+	                    .email(companyDto.getEmail())
+	                    .password(companyDto.getPassword())
+	                    .address(companyDto.getAddress())
+	                    .build();
 
-			// Generate license
-			String license = licenseGenerator.generateLicense(company);
-			company.setLicense(license);
-			company.setStatus(Status.CREATE);
+	            // Generate license
+	            String license = licenseGenerator.generateLicense(company);
+	            company.setLicense(license);
+	            company.setStatus(Status.CREATE);
 
-			// Save company
-			Company savedCompany = companyRepository.save(company);
+	            // Save company to get the ID
+	            Company savedCompany = companyRepository.save(company);
 
-			// Send OTP
-			otpService.generateAndSendOtp(companyDto.getEmail());
+	            // Generate and send OTP
+	            otpService.generateAndSendOtp(savedCompany.getEmail());
 
-			return savedCompany;
-		} catch (Exception e) {
-			throw new CompanyServiceException("Failed to create company", e);
-		}
-	}
+	            return savedCompany;
+	        } catch (Exception e) {
+	            throw new CompanyServiceException("Failed to create company", e);
+	        }
+	    }
+	 
+	 //login 
+	 
+	 public String login(String email, String password) {
+	        Company company = companyRepository.findByEmailAndPassword(email, password);
+
+	        if (company != null && company.getEmail().equals(email) && company.getPassword().equals(password)) {
+	            return "Login successfully";
+	        } else {
+	            return "Invalid email or password";
+	        }
+	    }
+	 
+	 
+	 public void resetPassword(String email, String newPassword) {
+	        Company company = companyRepository.findByEmail(email);
+	        if (company != null) {
+	            company.setPassword(newPassword);
+	            companyRepository.save(company);
+	        } else {
+	            throw new CompanyServiceException("No company found with the provided email");
+	        }
+	    }
 
 	public EncryptedData encryptEmailLicense(String companyName, String adminEmail, String subject) {
 		Company company = companyRepository.findByCompanyName(companyName)
