@@ -76,6 +76,7 @@ public class CompanyController {
 	        }
 	    }
 	 
+	 
 	 @PostMapping("/reset-password")
 	    public ResponseEntity<Response> resetPassword(@RequestParam String email, @RequestParam String otp, @RequestParam String newPassword) {
 	        TransactionContext context = responseGenerator.generateTransactionContext(null);
